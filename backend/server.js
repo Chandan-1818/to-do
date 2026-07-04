@@ -28,11 +28,47 @@ const app = express();
 
 // ── 5. Middleware ──────────────────────────────────────────────────────────────
 
-// Allow requests from the React dev server and production origin
+// Build the list of allowed origins.
+//
+// In development both Vite ports (3000 and 5173) are always permitted.
+// In production, CLIENT_URL must be set to the deployed frontend URL
+// (e.g. https://to-do-six-chandan.vercel.app).
+//
+// Using an allowlist + a function origin means:
+//   - Requests from unlisted origins are rejected with a CORS error.
+//   - Credentials (Authorization header / cookies) are supported.
+const DEV_ORIGINS = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
+// CLIENT_URL may be a single URL or a comma-separated list, giving
+// flexibility to whitelist staging and production at the same time.
+const productionOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map((o) => o.trim())
+  : [];
+
+const allowedOrigins = [...DEV_ORIGINS, ...productionOrigins];
+
+console.log("Allowed CORS origins:", allowedOrigins);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
-    credentials: true,
+    origin: (incomingOrigin, callback) => {
+      // Allow server-to-server requests (no Origin header, e.g. curl, Postman)
+      if (!incomingOrigin) return callback(null, true);
+
+      if (allowedOrigins.includes(incomingOrigin)) {
+        callback(null, true);
+      } else {
+        callback(
+          new Error(
+            `CORS: origin '${incomingOrigin}' is not in the allowed list`
+          )
+        );
+      }
+    },
+    credentials: true, // required for Authorization header and cookies
   })
 );
 
