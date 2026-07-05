@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { FiPlus, FiSave, FiX, FiChevronDown, FiTag } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCategories }       from "../context/CategoryContext";
+import { getCategoryIcon }     from "../utils/categoryIcons";
 import CategoryFormModal       from "./CategoryFormModal";
 
 const INITIAL = {
@@ -20,14 +21,27 @@ export default function TaskForm({
   loading = false,
   isEdit  = false,
 }) {
-  const { categories } = useCategories();
+  const { categories, loading: catsLoading, refresh: refreshCategories } = useCategories();
   const [form,     setForm]     = useState(INITIAL);
   const [errors,   setErrors]   = useState({});
   const [expanded, setExpanded] = useState(isEdit);
   const [catSearch, setCatSearch] = useState("");
   const [catOpen,   setCatOpen]   = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
+  // Overflow must be hidden only WHILE the extras section animates.
+  // If it stays hidden, the absolutely-positioned category dropdown menu
+  // gets clipped and appears empty/invisible.
+  const [extrasOverflow, setExtrasOverflow] = useState("hidden");
   const catRef = useRef(null);
+
+  // Re-fetch categories every time the dropdown is opened so the list is
+  // always fresh (e.g. after creating a category on another page/tab).
+  const handleDropdownToggle = () => {
+    setCatOpen((prev) => {
+      if (!prev) refreshCategories();
+      return !prev;
+    });
+  };
 
   // Pre-fill when editing
   useEffect(() => {
@@ -161,7 +175,13 @@ export default function TaskForm({
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: "easeInOut" }}
-              style={{ overflow: "hidden" }}
+              onAnimationStart={() => setExtrasOverflow("hidden")}
+              onAnimationComplete={(definition) => {
+                // Once fully expanded, allow the category dropdown menu
+                // (position: absolute) to overflow the container.
+                if (definition?.height === "auto") setExtrasOverflow("visible");
+              }}
+              style={{ overflow: extrasOverflow }}
             >
               <div className="task-form__extras-inner">
                 {/* Description */}
@@ -201,13 +221,17 @@ export default function TaskForm({
                       <button
                         type="button"
                         className="input cat-dropdown__trigger"
-                        onClick={() => setCatOpen((p) => !p)}
+                        onClick={handleDropdownToggle}
                         aria-expanded={catOpen}
                         aria-label="Select category"
                         disabled={loading}
                       >
                         {selectedCat ? (
-                          <span className="cat-dropdown__selected">
+                          <span className="cat-dropdown__selected" style={{ color: selectedCat.color }}>
+                            {(() => {
+                              const SelIcon = getCategoryIcon(selectedCat.icon);
+                              return <SelIcon aria-hidden="true" />;
+                            })()}
                             <span
                               className="cat-dropdown__dot"
                               style={{ background: selectedCat.color }}
@@ -232,47 +256,82 @@ export default function TaskForm({
                             transition={{ duration: 0.15 }}
                             style={{ transformOrigin: "top" }}
                           >
-                            {/* Search within dropdown */}
-                            <input
-                              className="input cat-dropdown__search"
-                              placeholder="Search categories…"
-                              value={catSearch}
-                              onChange={(e) => setCatSearch(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              autoFocus
-                            />
+                            {/* Loading state while categories are fetched */}
+                            {catsLoading && categories.length === 0 ? (
+                              <div className="cat-dropdown__loading" role="status">
+                                <span className="spinner spinner--sm" />
+                                <span>Loading categories…</span>
+                              </div>
+                            ) : categories.length === 0 ? (
+                              /* Empty state — no categories exist yet */
+                              <div className="cat-dropdown__empty">
+                                <p className="cat-dropdown__empty-text">
+                                  You don&apos;t have any categories yet.
+                                </p>
+                                <button
+                                  type="button"
+                                  className="btn btn--primary btn--sm"
+                                  onClick={() => { setCatOpen(false); setCatModalOpen(true); }}
+                                >
+                                  <FiPlus /> Create Category
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Search within dropdown */}
+                                <input
+                                  className="input cat-dropdown__search"
+                                  placeholder="Search categories…"
+                                  value={catSearch}
+                                  onChange={(e) => setCatSearch(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
+                                />
 
-                            {/* None option */}
-                            <button
-                              type="button"
-                              className={`cat-dropdown__option${!form.category ? " cat-dropdown__option--active" : ""}`}
-                              onClick={() => { setForm((p) => ({ ...p, category: "" })); setCatOpen(false); setCatSearch(""); }}
-                            >
-                              <span className="cat-dropdown__dot" style={{ background: "var(--text-disabled)" }} />
-                              No category
-                            </button>
+                                {/* None option */}
+                                <button
+                                  type="button"
+                                  className={`cat-dropdown__option${!form.category ? " cat-dropdown__option--active" : ""}`}
+                                  onClick={() => { setForm((p) => ({ ...p, category: "" })); setCatOpen(false); setCatSearch(""); }}
+                                >
+                                  <span className="cat-dropdown__dot" style={{ background: "var(--text-disabled)" }} />
+                                  No category
+                                </button>
 
-                            {/* Filtered categories */}
-                            {filteredCats.map((cat) => (
-                              <button
-                                key={cat._id}
-                                type="button"
-                                className={`cat-dropdown__option${form.category === cat._id ? " cat-dropdown__option--active" : ""}`}
-                                onClick={() => { setForm((p) => ({ ...p, category: cat._id })); setCatOpen(false); setCatSearch(""); }}
-                              >
-                                <span className="cat-dropdown__dot" style={{ background: cat.color }} />
-                                {cat.name}
-                              </button>
-                            ))}
+                                {/* Filtered categories — icon + colour + name */}
+                                {filteredCats.map((cat) => {
+                                  const CatIcon = getCategoryIcon(cat.icon);
+                                  return (
+                                    <button
+                                      key={cat._id}
+                                      type="button"
+                                      className={`cat-dropdown__option${form.category === cat._id ? " cat-dropdown__option--active" : ""}`}
+                                      onClick={() => { setForm((p) => ({ ...p, category: cat._id })); setCatOpen(false); setCatSearch(""); }}
+                                    >
+                                      <CatIcon style={{ color: cat.color, flexShrink: 0 }} aria-hidden="true" />
+                                      <span className="cat-dropdown__dot" style={{ background: cat.color }} />
+                                      {cat.name}
+                                    </button>
+                                  );
+                                })}
 
-                            {/* Quick create */}
-                            <button
-                              type="button"
-                              className="cat-dropdown__create"
-                              onClick={() => { setCatOpen(false); setCatModalOpen(true); }}
-                            >
-                              <FiPlus /> New category…
-                            </button>
+                                {/* No search matches */}
+                                {catSearch && filteredCats.length === 0 && (
+                                  <p className="cat-dropdown__empty-text" style={{ padding: ".45rem .65rem" }}>
+                                    No categories match &quot;{catSearch}&quot;
+                                  </p>
+                                )}
+
+                                {/* Quick create */}
+                                <button
+                                  type="button"
+                                  className="cat-dropdown__create"
+                                  onClick={() => { setCatOpen(false); setCatModalOpen(true); }}
+                                >
+                                  <FiPlus /> Create Category
+                                </button>
+                              </>
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -298,10 +357,12 @@ export default function TaskForm({
         </AnimatePresence>
       </form>
 
-      {/* Inline "create category" modal triggered from the dropdown */}
+      {/* Inline "create category" modal triggered from the dropdown.
+          The freshly created category is auto-selected on the task. */}
       <CategoryFormModal
         open={catModalOpen}
         onClose={() => setCatModalOpen(false)}
+        onCreated={(cat) => setForm((p) => ({ ...p, category: cat._id }))}
       />
     </>
   );

@@ -6,7 +6,32 @@
 const { validationResult } = require("express-validator");
 const mongoose = require("mongoose");
 const Task     = require("../models/Task");
+const Category = require("../models/Category");
 const { createNotification } = require("./notificationController");
+
+// ── Helper: resolve and validate a category id sent by the client ─────────────
+// Accepts both `category` and `categoryId` field names.
+// Returns { ok: true, value: ObjectId | null } on success,
+// or { ok: false, message } when the id is malformed, doesn't exist,
+// or belongs to another user.
+const resolveCategoryId = async (rawValue, userId) => {
+  // Empty / null / undefined → uncategorised (valid)
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return { ok: true, value: null };
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(rawValue)) {
+    return { ok: false, message: "Invalid category ID" };
+  }
+
+  // Ownership check — the category must exist AND belong to this user
+  const category = await Category.findOne({ _id: rawValue, user: userId });
+  if (!category) {
+    return { ok: false, message: "Category not found or does not belong to you" };
+  }
+
+  return { ok: true, value: category._id };
+};
 
 // ── GET /api/tasks ─────────────────────────────────────────────────────────────
 const getAllTasks = async (req, res) => {
@@ -261,18 +286,21 @@ const createTask = async (req, res) => {
   }
 
   try {
-    const { title, description, priority, category, dueDate } = req.body;
+    const { title, description, priority, category, categoryId, dueDate } = req.body;
 
-    const categoryId = category && mongoose.Types.ObjectId.isValid(category)
-      ? new mongoose.Types.ObjectId(category)
-      : null;
+    // Accept both `category` and `categoryId` field names, then validate
+    // format + ownership before assigning.
+    const resolved = await resolveCategoryId(categoryId ?? category, req.user._id);
+    if (!resolved.ok) {
+      return res.status(400).json({ success: false, message: resolved.message });
+    }
 
     const task = await Task.create({
       user:        req.user._id,
       title:       title.trim(),
       description: description?.trim() || "",
       priority:    priority || "medium",
-      category:    categoryId,
+      category:    resolved.value,
       dueDate:     dueDate || null,
     });
 
@@ -307,7 +335,7 @@ const updateTask = async (req, res) => {
   }
 
   try {
-    const { title, completed, description, priority, category, dueDate } = req.body;
+    const { title, completed, description, priority, category, categoryId, dueDate } = req.body;
     const updateFields = {};
 
     if (title       !== undefined) updateFields.title       = title.trim();
@@ -316,10 +344,14 @@ const updateTask = async (req, res) => {
     if (priority    !== undefined) updateFields.priority    = priority;
     if (dueDate     !== undefined) updateFields.dueDate     = dueDate || null;
 
-    if (category !== undefined) {
-      updateFields.category = category && mongoose.Types.ObjectId.isValid(category)
-        ? new mongoose.Types.ObjectId(category)
-        : null;
+    // Accept both `category` and `categoryId` field names, then validate
+    // format + ownership before assigning.
+    if (category !== undefined || categoryId !== undefined) {
+      const resolved = await resolveCategoryId(categoryId ?? category, req.user._id);
+      if (!resolved.ok) {
+        return res.status(400).json({ success: false, message: resolved.message });
+      }
+      updateFields.category = resolved.value;
     }
 
     const task = await Task.findOneAndUpdate(

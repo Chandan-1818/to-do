@@ -47,7 +47,7 @@ const ICON_MAP = Object.fromEntries(ICONS.map(({ id, Icon }) => [id, Icon]));
 
 const INITIAL = { name: "", icon: "FiFolder", color: "#6366f1", description: "" };
 
-export default function CategoryFormModal({ open, onClose, editData = null, onUpdated }) {
+export default function CategoryFormModal({ open, onClose, editData = null, onUpdated, onCreated }) {
   const { showToast }                          = useToast();
   const { addCategory, updateCategory }        = useCategories();
   const [form,    setForm]    = useState(INITIAL);
@@ -96,6 +96,7 @@ export default function CategoryFormModal({ open, onClose, editData = null, onUp
       } else {
         const res = await categoriesAPI.create(form);
         addCategory(res.data.data);
+        if (onCreated) onCreated(res.data.data); // e.g. auto-select in TaskForm
         showToast("Category created!", "success");
       }
       onClose();

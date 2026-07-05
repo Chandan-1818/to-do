@@ -750,6 +750,15 @@ body {
   margin-top: .3rem;
 }
 .cat-dropdown__create:hover { background: var(--brand-subtle); }
+.cat-dropdown__loading {
+  display: flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .9rem .65rem; font-size: .82rem; color: var(--text-muted);
+}
+.cat-dropdown__empty {
+  display: flex; flex-direction: column; align-items: center; gap: .6rem;
+  padding: .9rem .65rem; text-align: center;
+}
+.cat-dropdown__empty-text { font-size: .82rem; color: var(--text-muted); }
 
 /* ── Category form modal ─────────────────────────────────────────── */
 .cat-modal__preview {
