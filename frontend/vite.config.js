@@ -12,6 +12,11 @@ export default defineConfig({
 
   server: {
     port: 3000,
+
+    // Allow preview hosts such as v0.app, Vercel preview URLs,
+    // GitHub imports, StackBlitz, etc.
+    allowedHosts: true,
+
     proxy: {
       "/api": {
         target: "http://localhost:5000",
@@ -21,21 +26,38 @@ export default defineConfig({
   },
 
   build: {
-    // Suppress the warning — our split chunks are all well under 500 kB
+    // Suppress the warning — our split chunks are all well under 600 kB
     chunkSizeWarningLimit: 600,
+
     rollupOptions: {
       output: {
         manualChunks: {
-          // React core
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          // Animation library
-          "vendor-motion": ["framer-motion"],
-          // Charts — largest single dependency, isolate it
-          "vendor-recharts": ["recharts"],
-          // Icon library
-          "vendor-icons": ["react-icons"],
-          // HTTP client
-          "vendor-axios": ["axios"],
+          // React
+          "vendor-react": [
+            "react",
+            "react-dom",
+            "react-router-dom",
+          ],
+
+          // Animations
+          "vendor-motion": [
+            "framer-motion",
+          ],
+
+          // Charts
+          "vendor-recharts": [
+            "recharts",
+          ],
+
+          // Icons
+          "vendor-icons": [
+            "react-icons",
+          ],
+
+          // HTTP
+          "vendor-axios": [
+            "axios",
+          ],
         },
       },
     },
