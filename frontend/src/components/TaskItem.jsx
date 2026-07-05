@@ -4,8 +4,7 @@
 
 import { useState }             from "react";
 import { motion }               from "framer-motion";
-import { FiEdit2, FiTrash2, FiCalendar, FiFlag, FiCheckCircle, FiCircle } from "react-icons/fi";
-import { useCategories }        from "../context/CategoryContext";
+import { FiEdit2, FiTrash2, FiCalendar, FiCheckCircle, FiCircle } from "react-icons/fi";
 import TaskForm                 from "./TaskForm";
 import ConfirmDialog            from "./ConfirmDialog";
 

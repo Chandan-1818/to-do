@@ -261,10 +261,12 @@ const createTask = async (req, res) => {
   }
 
   try {
-    const { title, description, priority, category, dueDate } = req.body;
+    const { title, description, priority, category, categoryId, dueDate } = req.body;
 
-    const categoryId = category && mongoose.Types.ObjectId.isValid(category)
-      ? new mongoose.Types.ObjectId(category)
+    // Accept either `categoryId` (spec field name) or `category` (legacy field name)
+    const rawCategory = categoryId ?? category;
+    const resolvedCategoryId = rawCategory && mongoose.Types.ObjectId.isValid(rawCategory)
+      ? new mongoose.Types.ObjectId(rawCategory)
       : null;
 
     const task = await Task.create({
@@ -272,7 +274,7 @@ const createTask = async (req, res) => {
       title:       title.trim(),
       description: description?.trim() || "",
       priority:    priority || "medium",
-      category:    categoryId,
+      category:    resolvedCategoryId,
       dueDate:     dueDate || null,
     });
 
@@ -307,7 +309,7 @@ const updateTask = async (req, res) => {
   }
 
   try {
-    const { title, completed, description, priority, category, dueDate } = req.body;
+    const { title, completed, description, priority, category, categoryId, dueDate } = req.body;
     const updateFields = {};
 
     if (title       !== undefined) updateFields.title       = title.trim();
@@ -316,9 +318,11 @@ const updateTask = async (req, res) => {
     if (priority    !== undefined) updateFields.priority    = priority;
     if (dueDate     !== undefined) updateFields.dueDate     = dueDate || null;
 
-    if (category !== undefined) {
-      updateFields.category = category && mongoose.Types.ObjectId.isValid(category)
-        ? new mongoose.Types.ObjectId(category)
+    // Accept either `categoryId` (spec field name) or `category` (legacy field name)
+    const rawCategory = categoryId !== undefined ? categoryId : category;
+    if (rawCategory !== undefined) {
+      updateFields.category = rawCategory && mongoose.Types.ObjectId.isValid(rawCategory)
+        ? new mongoose.Types.ObjectId(rawCategory)
         : null;
     }
 

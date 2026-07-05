@@ -8,7 +8,7 @@ import { useParams, useNavigate, Link }              from "react-router-dom";
 import { motion, AnimatePresence }                   from "framer-motion";
 import {
   FiArrowLeft, FiEdit2, FiTrash2, FiList,
-  FiCheckCircle, FiClock, FiAlertCircle,
+  FiCheckCircle, FiClock,
   FiCalendar, FiTrendingUp, FiAlertTriangle,
   FiFolder, FiBriefcase, FiHome, FiBook, FiHeart,
   FiShoppingCart, FiMusic, FiCamera, FiCode, FiStar,

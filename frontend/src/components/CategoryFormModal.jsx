@@ -47,7 +47,7 @@ const ICON_MAP = Object.fromEntries(ICONS.map(({ id, Icon }) => [id, Icon]));
 
 const INITIAL = { name: "", icon: "FiFolder", color: "#6366f1", description: "" };
 
-export default function CategoryFormModal({ open, onClose, editData = null, onUpdated }) {
+export default function CategoryFormModal({ open, onClose, editData = null, onUpdated, onCreated }) {
   const { showToast }                          = useToast();
   const { addCategory, updateCategory }        = useCategories();
   const [form,    setForm]    = useState(INITIAL);
@@ -91,11 +91,13 @@ export default function CategoryFormModal({ open, onClose, editData = null, onUp
       if (isEdit) {
         const res = await categoriesAPI.update(editData._id, form);
         updateCategory(res.data.data);
-        if (onUpdated) onUpdated(res.data.data);   // notify parent (e.g. CategoryDetailPage)
+        if (onUpdated) onUpdated(res.data.data);
         showToast("Category updated!", "success");
       } else {
         const res = await categoriesAPI.create(form);
         addCategory(res.data.data);
+        // Notify parent (e.g. TaskForm) so it can auto-select the new category
+        if (onCreated) onCreated(res.data.data);
         showToast("Category created!", "success");
       }
       onClose();
