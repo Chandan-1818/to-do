@@ -1,147 +1,163 @@
 // src/components/TaskItem.jsx
-// Single task card with: toggle, inline edit form, delete (with confirmation),
-// priority badge, category tag, and due-date display.
+// Premium animated task card with glass morphism, priority badge,
+// category badge, due-date overdue indicator, and Framer Motion lift.
 
-import { useState } from "react";
-import { FiEdit2, FiTrash2, FiCalendar, FiTag, FiFlag } from "react-icons/fi";
-import TaskForm     from "./TaskForm";
-import ConfirmDialog from "./ConfirmDialog";
+import { useState }             from "react";
+import { motion }               from "framer-motion";
+import { FiEdit2, FiTrash2, FiCalendar, FiFlag, FiCheckCircle, FiCircle } from "react-icons/fi";
+import { useCategories }        from "../context/CategoryContext";
+import TaskForm                 from "./TaskForm";
+import ConfirmDialog            from "./ConfirmDialog";
 
-// ── Helper: priority badge ────────────────────────────────────────────────────
-const PRIORITY_CONFIG = {
-  low:    { label: "Low",    cls: "badge--low",    icon: "🟢" },
-  medium: { label: "Medium", cls: "badge--medium", icon: "🟡" },
-  high:   { label: "High",   cls: "badge--high",   icon: "🔴" },
+const PRIORITY = {
+  high:   { label: "High",   cls: "badge--high",   dot: "#ef4444" },
+  medium: { label: "Medium", cls: "badge--medium", dot: "#f59e0b" },
+  low:    { label: "Low",    cls: "badge--low",     dot: "#22c55e" },
 };
 
-// ── Helper: due date display ──────────────────────────────────────────────────
-function DueDateBadge({ dueDate }) {
+function DueBadge({ dueDate }) {
   if (!dueDate) return null;
-  const date     = new Date(dueDate);
-  const today    = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isOverdue = date < today;
-  const formatted = date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-
+  const d = new Date(dueDate);
+  const t = new Date(); t.setHours(0,0,0,0);
+  const overdue = d < t;
   return (
-    <span className={`task-meta__badge ${isOverdue ? "task-meta__badge--overdue" : ""}`}>
+    <span className={`task-badge task-badge--due${overdue ? " task-badge--overdue" : ""}`}>
       <FiCalendar />
-      {formatted}
-      {isOverdue && " · Overdue"}
+      {d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+      {overdue && " · Overdue"}
     </span>
   );
 }
 
-/**
- * TaskItem
- * Props:
- *  task               - { _id, title, description, completed, priority, category, dueDate, createdAt }
- *  onToggle(id)       - toggle completed status
- *  onDelete(id)       - delete task
- *  onEdit(id, data)   - update task fields
- */
-function TaskItem({ task, onToggle, onDelete, onEdit }) {
-  const [isEditing,    setIsEditing]    = useState(false);
-  const [confirmOpen,  setConfirmOpen]  = useState(false);
+export default function TaskItem({ task, onToggle, onDelete, onEdit }) {
+  const [isEditing,   setIsEditing]   = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { label: priorityLabel, cls: priorityCls, icon: priorityIcon } =
-    PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
+  const p = PRIORITY[task.priority] || PRIORITY.medium;
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleEditSubmit = (formData) => {
-    onEdit(task._id, formData);
-    setIsEditing(false);
-  };
+  // category can be either populated object or raw id
+  const cat = task.category;
 
-  const handleDeleteConfirm = () => {
-    onDelete(task._id);
-    setConfirmOpen(false);
-  };
-
-  // ── Render ───────────────────────────────────────────────────────────────────
   if (isEditing) {
     return (
-      <li className="task-item task-item--editing">
+      <motion.li layout className="task-item--editing">
         <TaskForm
           initialData={task}
-          onSubmit={handleEditSubmit}
+          onSubmit={(data) => { onEdit(task._id, data); setIsEditing(false); }}
           onCancel={() => setIsEditing(false)}
           isEdit
         />
-      </li>
+      </motion.li>
     );
   }
 
   return (
     <>
-      <li className={`task-item card ${task.completed ? "task-item--completed" : ""}`}>
-        {/* Left: checkbox + content */}
-        <div className="task-item__main">
-          <input
-            type="checkbox"
-            className="task-checkbox"
-            checked={task.completed}
-            onChange={() => onToggle(task._id)}
-            aria-label={`Mark "${task.title}" as ${task.completed ? "incomplete" : "complete"}`}
-          />
-          <div className="task-item__content">
-            <span className="task-item__title">{task.title}</span>
-            {task.description && (
-              <p className="task-item__description">{task.description}</p>
+      <motion.li
+        layout
+        className={`task-card glass-card${task.completed ? " task-card--done" : ""}`}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        whileHover={{ y: -2, boxShadow: "var(--shadow-lg)" }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+      >
+        {/* Left: animated checkbox */}
+        <motion.button
+          className="task-card__check"
+          onClick={() => onToggle(task._id)}
+          whileTap={{ scale: 0.85 }}
+          aria-label={`Mark "${task.title}" as ${task.completed ? "incomplete" : "complete"}`}
+        >
+          <motion.div
+            animate={{ scale: task.completed ? [1, 1.3, 1] : 1 }}
+            transition={{ duration: 0.25 }}
+          >
+            {task.completed
+              ? <FiCheckCircle className="task-card__check-icon task-card__check-icon--done" />
+              : <FiCircle      className="task-card__check-icon" />
+            }
+          </motion.div>
+        </motion.button>
+
+        {/* Centre: content */}
+        <div className="task-card__body">
+          <span className={`task-card__title${task.completed ? " task-card__title--done" : ""}`}>
+            {task.title}
+          </span>
+
+          {task.description && (
+            <p className="task-card__desc">{task.description}</p>
+          )}
+
+          {/* Badges row */}
+          <div className="task-card__meta">
+            {/* Priority */}
+            <span className={`task-badge ${p.cls}`}>
+              <span className="task-badge__dot" style={{ background: p.dot }} />
+              {p.label}
+            </span>
+
+            {/* Category */}
+            {cat && cat.name && (
+              <span
+                className="task-badge task-badge--cat"
+                style={{
+                  background: (cat.color || "#6366f1") + "20",
+                  color:      cat.color || "#6366f1",
+                  borderColor: (cat.color || "#6366f1") + "40",
+                }}
+              >
+                {cat.name}
+              </span>
             )}
-            {/* Meta row: priority, category, due date */}
-            <div className="task-meta">
-              <span className={`badge ${priorityCls}`} title={`Priority: ${priorityLabel}`}>
-                <FiFlag /> {priorityIcon} {priorityLabel}
-              </span>
-              {task.category && task.category !== "General" && (
-                <span className="badge badge--category">
-                  <FiTag /> {task.category}
-                </span>
-              )}
-              <DueDateBadge dueDate={task.dueDate} />
-              <span className="task-meta__date">
-                {new Date(task.createdAt).toLocaleDateString(undefined, {
-                  month: "short", day: "numeric", year: "numeric",
-                })}
-              </span>
-            </div>
+
+            {/* Due date */}
+            <DueBadge dueDate={task.dueDate} />
+
+            {/* Created */}
+            <span className="task-card__date">
+              {new Date(task.createdAt).toLocaleDateString(undefined, {
+                month: "short", day: "numeric",
+              })}
+            </span>
           </div>
         </div>
 
         {/* Right: action buttons */}
-        <div className="task-item__actions">
-          <button
+        <div className="task-card__actions">
+          <motion.button
             className="icon-btn icon-btn--edit"
             onClick={() => setIsEditing(true)}
-            aria-label={`Edit task: ${task.title}`}
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Edit task"
             title="Edit"
           >
             <FiEdit2 />
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             className="icon-btn icon-btn--delete"
             onClick={() => setConfirmOpen(true)}
-            aria-label={`Delete task: ${task.title}`}
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Delete task"
             title="Delete"
           >
             <FiTrash2 />
-          </button>
+          </motion.button>
         </div>
-      </li>
+      </motion.li>
 
-      {/* Delete confirmation dialog */}
       <ConfirmDialog
         open={confirmOpen}
         title="Delete task?"
         message={`"${task.title}" will be permanently removed.`}
         confirmLabel="Delete"
         danger
-        onConfirm={handleDeleteConfirm}
+        onConfirm={() => { onDelete(task._id); setConfirmOpen(false); }}
         onCancel={() => setConfirmOpen(false)}
       />
     </>
   );
 }
-
-export default TaskItem;

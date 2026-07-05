@@ -1,42 +1,43 @@
 // src/components/TaskForm.jsx
-// Add / edit task form with title, description, priority, category, and due date.
-// Used both for creating a new task and for editing an existing one.
+// Add / edit task form. Category field uses a searchable dropdown populated
+// from CategoryContext. Includes an inline "Create category" shortcut.
 
-import { useState, useEffect } from "react";
-import { FiPlus, FiSave, FiX } from "react-icons/fi";
+import { useState, useEffect, useRef } from "react";
+import { FiPlus, FiSave, FiX, FiChevronDown, FiTag } from "react-icons/fi";
+import { motion, AnimatePresence } from "framer-motion";
+import { useCategories }       from "../context/CategoryContext";
+import CategoryFormModal       from "./CategoryFormModal";
 
-// Default shape of the form fields
-const INITIAL_STATE = {
-  title:       "",
-  description: "",
-  priority:    "medium",
-  category:    "General",
-  dueDate:     "",
+const INITIAL = {
+  title: "", description: "", priority: "medium",
+  category: "", dueDate: "",
 };
 
-/**
- * TaskForm
- * Props:
- *  onSubmit(formData)  - called with the form values on submit
- *  initialData         - pre-fills fields when editing an existing task
- *  onCancel            - called when the user cancels an edit
- *  loading             - disables the form while an API call is in flight
- *  isEdit              - changes button label and behaviour
- */
-function TaskForm({ onSubmit, initialData = null, onCancel, loading = false, isEdit = false }) {
-  const [form,   setForm]   = useState(INITIAL_STATE);
-  const [errors, setErrors] = useState({});
-  const [expanded, setExpanded] = useState(isEdit); // show extra fields by default in edit mode
+export default function TaskForm({
+  onSubmit,
+  initialData = null,
+  onCancel,
+  loading = false,
+  isEdit  = false,
+}) {
+  const { categories } = useCategories();
+  const [form,     setForm]     = useState(INITIAL);
+  const [errors,   setErrors]   = useState({});
+  const [expanded, setExpanded] = useState(isEdit);
+  const [catSearch, setCatSearch] = useState("");
+  const [catOpen,   setCatOpen]   = useState(false);
+  const [catModalOpen, setCatModalOpen] = useState(false);
+  const catRef = useRef(null);
 
-  // When editing, pre-fill the form with existing task data
+  // Pre-fill when editing
   useEffect(() => {
     if (initialData) {
       setForm({
         title:       initialData.title       || "",
         description: initialData.description || "",
         priority:    initialData.priority    || "medium",
-        category:    initialData.category    || "General",
-        // Convert ISO date to YYYY-MM-DD for the date input
+        // category can be an ObjectId string or a populated object
+        category: initialData.category?._id || initialData.category || "",
         dueDate: initialData.dueDate
           ? new Date(initialData.dueDate).toISOString().split("T")[0]
           : "",
@@ -45,185 +46,263 @@ function TaskForm({ onSubmit, initialData = null, onCancel, loading = false, isE
     }
   }, [initialData]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (catRef.current && !catRef.current.contains(e.target)) setCatOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // ── Filtered categories for dropdown ──────────────────────────────────────
+  const filteredCats = categories.filter((c) =>
+    c.name.toLowerCase().includes(catSearch.toLowerCase())
+  );
+
+  const selectedCat = categories.find((c) => c._id === form.category);
+
   // ── Validation ─────────────────────────────────────────────────────────────
   const validate = () => {
     const errs = {};
     if (!form.title.trim())              errs.title = "Title is required";
-    if (form.title.trim().length > 200)  errs.title = "Title must be 200 characters or fewer";
-    if (form.category.trim().length > 50) errs.category = "Category must be 50 characters or fewer";
+    if (form.title.trim().length > 200)  errs.title = "Max 200 characters";
     return errs;
   };
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    // Clear the error for this field as the user types
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
-
+  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    // Build clean payload — send null for empty dueDate
-    const payload = {
+    onSubmit({
       title:       form.title.trim(),
       description: form.description.trim(),
       priority:    form.priority,
-      category:    form.category.trim() || "General",
-      dueDate:     form.dueDate || null,
-    };
-
-    onSubmit(payload);
+      category:    form.category || null,
+      dueDate:     form.dueDate  || null,
+    });
 
     if (!isEdit) {
-      setForm(INITIAL_STATE);
+      setForm(INITIAL);
       setExpanded(false);
       setErrors({});
     }
   };
 
   const handleCancel = () => {
-    setForm(INITIAL_STATE);
-    setErrors({});
-    setExpanded(false);
+    setForm(INITIAL); setErrors({}); setExpanded(false);
     if (onCancel) onCancel();
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const change = (field) => (e) => {
+    setForm((p) => ({ ...p, [field]: e.target.value }));
+    if (errors[field]) setErrors((p) => ({ ...p, [field]: "" }));
+  };
+
   return (
-    <form className="task-form card" onSubmit={handleSubmit} noValidate>
-      {/* ── Title row ──────────────────────────────────────────────────── */}
-      <div className="task-form__row">
-        <div className={`form-group form-group--flex ${errors.title ? "form-group--error" : ""}`}>
-          <input
-            type="text"
-            name="title"
-            className="input"
-            placeholder="What needs to be done?"
-            value={form.title}
-            onChange={handleChange}
-            disabled={loading}
-            maxLength={200}
-            aria-label="Task title"
-            aria-invalid={!!errors.title}
-            autoFocus={!isEdit}
-          />
-          {errors.title && <span className="form-error">{errors.title}</span>}
-        </div>
-
-        {/* Toggle the extra fields panel */}
-        {!isEdit && (
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => setExpanded((p) => !p)}
-            aria-expanded={expanded}
-            title={expanded ? "Hide options" : "Show more options"}
-          >
-            {expanded ? "Less" : "More"}
-          </button>
-        )}
-
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={loading || !form.title.trim()}
-        >
-          {loading ? (
-            <span className="spinner spinner--sm" />
-          ) : isEdit ? (
-            <><FiSave /> Save</>
-          ) : (
-            <><FiPlus /> Add Task</>
-          )}
-        </button>
-
-        {isEdit && (
-          <button type="button" className="btn btn--ghost" onClick={handleCancel}>
-            <FiX /> Cancel
-          </button>
-        )}
-      </div>
-
-      {/* ── Expandable extra fields ────────────────────────────────────── */}
-      {expanded && (
-        <div className="task-form__extras">
-          {/* Description */}
-          <div className="form-group">
-            <label className="form-label" htmlFor="description">Description (optional)</label>
-            <textarea
-              id="description"
-              name="description"
-              className="input textarea"
-              placeholder="Add notes..."
-              value={form.description}
-              onChange={handleChange}
+    <>
+      <form className="task-form glass-card" onSubmit={handleSubmit} noValidate>
+        {/* ── Title row ────────────────────────────────────────────── */}
+        <div className="task-form__row">
+          <div className={`form-group form-group--flex ${errors.title ? "form-group--error" : ""}`}>
+            <input
+              type="text"
+              className="input task-form__title-input"
+              placeholder={isEdit ? "Task title" : "What needs to be done?"}
+              value={form.title}
+              onChange={change("title")}
               disabled={loading}
-              maxLength={1000}
-              rows={2}
+              maxLength={200}
+              aria-label="Task title"
+              autoFocus={!isEdit}
             />
+            {errors.title && <span className="form-error">{errors.title}</span>}
           </div>
 
-          <div className="task-form__grid">
-            {/* Priority */}
-            <div className="form-group">
-              <label className="form-label" htmlFor="priority">Priority</label>
-              <select
-                id="priority"
-                name="priority"
-                className="input select"
-                value={form.priority}
-                onChange={handleChange}
-                disabled={loading}
-              >
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
-              </select>
-            </div>
+          {!isEdit && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setExpanded((p) => !p)}
+              aria-expanded={expanded}
+            >
+              {expanded ? "Less" : "Details"}
+            </button>
+          )}
 
-            {/* Category */}
-            <div className={`form-group ${errors.category ? "form-group--error" : ""}`}>
-              <label className="form-label" htmlFor="category">Category</label>
-              <input
-                id="category"
-                type="text"
-                name="category"
-                className="input"
-                placeholder="e.g. Work, Personal"
-                value={form.category}
-                onChange={handleChange}
-                disabled={loading}
-                maxLength={50}
-              />
-              {errors.category && <span className="form-error">{errors.category}</span>}
-            </div>
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={loading || !form.title.trim()}
+          >
+            {loading
+              ? <span className="spinner spinner--sm" />
+              : isEdit
+                ? <><FiSave /> Save</>
+                : <><FiPlus /> Add</>
+            }
+          </button>
 
-            {/* Due Date */}
-            <div className="form-group">
-              <label className="form-label" htmlFor="dueDate">Due Date (optional)</label>
-              <input
-                id="dueDate"
-                type="date"
-                name="dueDate"
-                className="input"
-                value={form.dueDate}
-                onChange={handleChange}
-                disabled={loading}
-                min={new Date().toISOString().split("T")[0]}
-              />
-            </div>
-          </div>
+          {isEdit && (
+            <button type="button" className="btn btn--ghost" onClick={handleCancel}>
+              <FiX />
+            </button>
+          )}
         </div>
-      )}
-    </form>
+
+        {/* ── Expandable extras ─────────────────────────────────────── */}
+        <AnimatePresence initial={false}>
+          {expanded && (
+            <motion.div
+              className="task-form__extras"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: "easeInOut" }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="task-form__extras-inner">
+                {/* Description */}
+                <div className="form-group">
+                  <label className="form-label">Notes (optional)</label>
+                  <textarea
+                    className="input textarea"
+                    placeholder="Add context or notes…"
+                    value={form.description}
+                    onChange={change("description")}
+                    disabled={loading}
+                    maxLength={1000}
+                    rows={2}
+                  />
+                </div>
+
+                <div className="task-form__grid">
+                  {/* Priority */}
+                  <div className="form-group">
+                    <label className="form-label">Priority</label>
+                    <select
+                      className="input select"
+                      value={form.priority}
+                      onChange={change("priority")}
+                      disabled={loading}
+                    >
+                      <option value="low">🟢 Low</option>
+                      <option value="medium">🟡 Medium</option>
+                      <option value="high">🔴 High</option>
+                    </select>
+                  </div>
+
+                  {/* Category searchable dropdown */}
+                  <div className="form-group" ref={catRef}>
+                    <label className="form-label">Category</label>
+                    <div className="cat-dropdown">
+                      <button
+                        type="button"
+                        className="input cat-dropdown__trigger"
+                        onClick={() => setCatOpen((p) => !p)}
+                        aria-expanded={catOpen}
+                        aria-label="Select category"
+                        disabled={loading}
+                      >
+                        {selectedCat ? (
+                          <span className="cat-dropdown__selected">
+                            <span
+                              className="cat-dropdown__dot"
+                              style={{ background: selectedCat.color }}
+                            />
+                            {selectedCat.name}
+                          </span>
+                        ) : (
+                          <span className="cat-dropdown__placeholder">
+                            <FiTag /> No category
+                          </span>
+                        )}
+                        <FiChevronDown className="cat-dropdown__chevron" />
+                      </button>
+
+                      <AnimatePresence>
+                        {catOpen && (
+                          <motion.div
+                            className="cat-dropdown__menu"
+                            initial={{ opacity: 0, y: -6, scaleY: 0.95 }}
+                            animate={{ opacity: 1, y: 0,  scaleY: 1    }}
+                            exit={{    opacity: 0, y: -6, scaleY: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            style={{ transformOrigin: "top" }}
+                          >
+                            {/* Search within dropdown */}
+                            <input
+                              className="input cat-dropdown__search"
+                              placeholder="Search categories…"
+                              value={catSearch}
+                              onChange={(e) => setCatSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              autoFocus
+                            />
+
+                            {/* None option */}
+                            <button
+                              type="button"
+                              className={`cat-dropdown__option${!form.category ? " cat-dropdown__option--active" : ""}`}
+                              onClick={() => { setForm((p) => ({ ...p, category: "" })); setCatOpen(false); setCatSearch(""); }}
+                            >
+                              <span className="cat-dropdown__dot" style={{ background: "var(--text-disabled)" }} />
+                              No category
+                            </button>
+
+                            {/* Filtered categories */}
+                            {filteredCats.map((cat) => (
+                              <button
+                                key={cat._id}
+                                type="button"
+                                className={`cat-dropdown__option${form.category === cat._id ? " cat-dropdown__option--active" : ""}`}
+                                onClick={() => { setForm((p) => ({ ...p, category: cat._id })); setCatOpen(false); setCatSearch(""); }}
+                              >
+                                <span className="cat-dropdown__dot" style={{ background: cat.color }} />
+                                {cat.name}
+                              </button>
+                            ))}
+
+                            {/* Quick create */}
+                            <button
+                              type="button"
+                              className="cat-dropdown__create"
+                              onClick={() => { setCatOpen(false); setCatModalOpen(true); }}
+                            >
+                              <FiPlus /> New category…
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Due date */}
+                  <div className="form-group">
+                    <label className="form-label">Due date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={form.dueDate}
+                      onChange={change("dueDate")}
+                      disabled={loading}
+                      min={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </form>
+
+      {/* Inline "create category" modal triggered from the dropdown */}
+      <CategoryFormModal
+        open={catModalOpen}
+        onClose={() => setCatModalOpen(false)}
+      />
+    </>
   );
 }
-
-export default TaskForm;

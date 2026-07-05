@@ -4,6 +4,7 @@
 const jwt = require("jsonwebtoken");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
+const { createNotification } = require("./notificationController");
 
 // ── Guard: fail loudly at startup if JWT_SECRET is not configured ─────────────
 // This prevents a cryptic 500 at runtime and surfaces the misconfiguration
@@ -71,7 +72,16 @@ const register = async (req, res) => {
     // 3. Create user — password hashing happens in the pre-save hook
     const user = await User.create({ name, email, password });
 
-    // 4. Sign token and send response — INSIDE try/catch so jwt errors are caught
+    // 4. Fire a welcome notification (non-blocking)
+    createNotification(
+      user._id,
+      "welcome",
+      `Welcome to TaskFlow, ${name.trim()}! 🎉`,
+      "Start by creating your first task or setting up a category.",
+      null, null
+    );
+
+    // 5. Sign token and send response — INSIDE try/catch so jwt errors are caught
     console.log(`[register] New user created: ${user.email} (${user._id})`);
     sendAuthResponse(res, 201, user, "Account created successfully");
   } catch (error) {

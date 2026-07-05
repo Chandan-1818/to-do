@@ -1,23 +1,23 @@
 // src/pages/TasksPage.jsx
-// Full task management page with add form, search, filters, sort, and pagination.
+// Full task management page.
+// Reads ?category= from the URL so links from CategoryDetailPage pre-filter
+// the list without any extra clicks.
 
-import { useState, useEffect, useCallback } from "react";
-import { useToast } from "../context/ToastContext";
-import { tasksAPI } from "../api";
-import TaskForm from "../components/TaskForm";
-import TaskList from "../components/TaskList";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams }  from "react-router-dom";
+import { useToast }         from "../context/ToastContext";
+import { tasksAPI }         from "../api";
+import TaskForm             from "../components/TaskForm";
+import TaskList             from "../components/TaskList";
 
-const DEFAULT_FILTERS = {
-  search:   "",
-  status:   "all",
-  sort:     "newest",
-  priority: "",
-};
+const LIMIT = 10;
 
-const LIMIT = 10; // tasks per page
+export default function TasksPage() {
+  const { showToast }      = useToast();
+  const [searchParams]     = useSearchParams();
 
-function TasksPage() {
-  const { showToast } = useToast();
+  // Seed the category filter from the URL query param (?category=<id>)
+  const urlCategory = searchParams.get("category") || "";
 
   const [tasks,      setTasks]      = useState([]);
   const [total,      setTotal]      = useState(0);
@@ -25,17 +25,25 @@ function TasksPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading,    setLoading]    = useState(true);
   const [addLoading, setAddLoading] = useState(false);
-  const [filters,    setFilters]    = useState(DEFAULT_FILTERS);
 
-  // ── Fetch tasks whenever filters or page change ────────────────────────────
-  const fetchTasks = useCallback(async (currentPage = 1, currentFilters = filters) => {
+  const [filters, setFilters] = useState({
+    search:   "",
+    status:   "all",
+    sort:     "newest",
+    priority: "",
+    category: urlCategory,   // pre-fill from URL if present
+  });
+
+  // ── Keep a stable ref to the latest filters so fetchTasks never goes stale ──
+  const filtersRef = useRef(filters);
+  useEffect(() => { filtersRef.current = filters; }, [filters]);
+
+  // ── Core fetch function ───────────────────────────────────────────────────
+  const fetchTasks = useCallback(async (currentPage = 1, overrideFilters = null) => {
+    const f = overrideFilters ?? filtersRef.current;
     setLoading(true);
     try {
-      const res = await tasksAPI.getAll({
-        ...currentFilters,
-        page:  currentPage,
-        limit: LIMIT,
-      });
+      const res = await tasksAPI.getAll({ ...f, page: currentPage, limit: LIMIT });
       const { data, total: t, totalPages: tp } = res.data;
       setTasks(t === 0 ? [] : data);
       setTotal(t);
@@ -46,29 +54,32 @@ function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, showToast]);
+  }, [showToast]);
 
-  // Initial load
-  useEffect(() => { fetchTasks(1, filters); }, []);
+  // ── Initial load ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetchTasks(1, filters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once — URL param already seeded into filters state
 
-  // Re-fetch when filters change (debounced for search)
+  // ── Re-fetch with debounce whenever filters change ────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => fetchTasks(1, filters), 300);
     return () => clearTimeout(timer);
-  }, [filters]);
+  }, [filters, fetchTasks]);
 
-  // ── Filter change handler ──────────────────────────────────────────────────
+  // ── Filter change handler ─────────────────────────────────────────────────
   const handleFilterChange = (name, value) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ── Add task ───────────────────────────────────────────────────────────────
+  // ── Add task ──────────────────────────────────────────────────────────────
   const handleAdd = async (formData) => {
     setAddLoading(true);
     try {
       await tasksAPI.create(formData);
       showToast("Task added!", "success");
-      fetchTasks(1, filters); // go back to page 1 to see the new task
+      fetchTasks(1, filters);
     } catch (err) {
       showToast(err.response?.data?.message || "Failed to add task", "error");
     } finally {
@@ -76,7 +87,7 @@ function TasksPage() {
     }
   };
 
-  // ── Toggle ─────────────────────────────────────────────────────────────────
+  // ── Toggle completed ──────────────────────────────────────────────────────
   const handleToggle = async (id) => {
     const task = tasks.find((t) => t._id === id);
     if (!task) return;
@@ -88,7 +99,7 @@ function TasksPage() {
     }
   };
 
-  // ── Edit ───────────────────────────────────────────────────────────────────
+  // ── Edit task ─────────────────────────────────────────────────────────────
   const handleEdit = async (id, data) => {
     try {
       const res = await tasksAPI.update(id, data);
@@ -99,12 +110,12 @@ function TasksPage() {
     }
   };
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
+  // ── Delete task ───────────────────────────────────────────────────────────
   const handleDelete = async (id) => {
     try {
       await tasksAPI.delete(id);
       showToast("Task deleted", "info");
-      // If we deleted the last item on this page, go back one
+      // If we deleted the only item on this page go back one page
       const nextPage = tasks.length === 1 && page > 1 ? page - 1 : page;
       fetchTasks(nextPage, filters);
     } catch {
@@ -112,18 +123,20 @@ function TasksPage() {
     }
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page tasks-page">
       <div className="page-header">
-        <h1 className="page-title">My Tasks</h1>
-        <p className="page-subtitle">Manage, filter, and organise everything in one place.</p>
+        <div>
+          <h1 className="page-title">My Tasks</h1>
+          <p className="page-subtitle">
+            Manage, filter, and organise everything in one place.
+          </p>
+        </div>
       </div>
 
-      {/* Add task form */}
       <TaskForm onSubmit={handleAdd} loading={addLoading} />
 
-      {/* Task list with toolbar */}
       <TaskList
         tasks={tasks}
         loading={loading}
@@ -140,5 +153,3 @@ function TasksPage() {
     </div>
   );
 }
-
-export default TasksPage;

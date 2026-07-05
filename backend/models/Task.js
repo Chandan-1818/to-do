@@ -1,6 +1,7 @@
 // models/Task.js
 // Mongoose schema for a To-Do task.
-// Extended with userId (owner), dueDate, priority, and category.
+// category field now holds an ObjectId reference to Category instead of a plain string.
+// The string fallback (categoryName) is kept for display when the category is deleted.
 
 const mongoose = require("mongoose");
 
@@ -25,7 +26,6 @@ const taskSchema = new mongoose.Schema({
     default: false,
   },
 
-  // Optional free-text description / notes
   description: {
     type: String,
     trim: true,
@@ -42,11 +42,11 @@ const taskSchema = new mongoose.Schema({
     default: "medium",
   },
 
+  // ObjectId reference to Category — nullable (task may be uncategorised)
   category: {
-    type: String,
-    trim: true,
-    maxlength: [50, "Category must be 50 characters or fewer"],
-    default: "General",
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    default: null,
   },
 
   dueDate: {
@@ -60,7 +60,8 @@ const taskSchema = new mongoose.Schema({
   },
 });
 
-// Index on user so "find all tasks for user X" is fast
+// Compound index for fast per-user queries
 taskSchema.index({ user: 1, createdAt: -1 });
+taskSchema.index({ user: 1, category: 1 });
 
 module.exports = mongoose.model("Task", taskSchema);

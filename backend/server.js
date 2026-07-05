@@ -16,9 +16,11 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const cors    = require("cors");
 
-const connectDB  = require("./config/db");
-const authRoutes = require("./routes/authRoutes");
-const taskRoutes = require("./routes/taskRoutes");
+const connectDB             = require("./config/db");
+const authRoutes            = require("./routes/authRoutes");
+const taskRoutes            = require("./routes/taskRoutes");
+const categoryRoutes        = require("./routes/categoryRoutes");
+const notificationRoutes    = require("./routes/notificationRoutes");
 
 // ── 3. Connect to MongoDB ──────────────────────────────────────────────────────
 connectDB();
@@ -76,8 +78,10 @@ app.use(
 app.use(express.json());
 
 // ── 6. Routes ──────────────────────────────────────────────────────────────────
-app.use("/api/auth",  authRoutes);
-app.use("/api/tasks", taskRoutes);
+app.use("/api/auth",           authRoutes);
+app.use("/api/tasks",          taskRoutes);
+app.use("/api/categories",     categoryRoutes);
+app.use("/api/notifications",  notificationRoutes);
 
 // Health-check endpoint
 app.get("/", (req, res) => {

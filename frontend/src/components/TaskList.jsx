@@ -1,137 +1,173 @@
 // src/components/TaskList.jsx
-// Renders the toolbar (search, filter, sort) and the paginated task list.
+// Animated filter chips, search bar, sort select, and paginated task list.
 
-import { FiSearch, FiFilter, FiChevronLeft, FiChevronRight, FiInbox } from "react-icons/fi";
-import TaskItem    from "./TaskItem";
+import { motion, AnimatePresence } from "framer-motion";
+import { FiSearch, FiX, FiInbox, FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import TaskItem       from "./TaskItem";
 import { SkeletonList } from "./Skeleton";
+import { useCategories } from "../context/CategoryContext";
 
-/**
- * TaskList
- * Props:
- *  tasks         - array of task objects for current page
- *  loading       - show skeleton while true
- *  total         - total tasks matching the current filter (for pagination)
- *  page          - current page number
- *  totalPages    - total number of pages
- *  filters       - { search, status, sort, priority }
- *  onFilterChange(name, value) - called when any filter changes
- *  onPageChange(n)             - called when page changes
- *  onToggle(id)
- *  onDelete(id)
- *  onEdit(id, data)
- */
-function TaskList({
-  tasks,
-  loading,
-  total,
-  page,
-  totalPages,
-  filters,
-  onFilterChange,
-  onPageChange,
-  onToggle,
-  onDelete,
-  onEdit,
+const STATUS_CHIPS = [
+  { value: "all",       label: "All"       },
+  { value: "pending",   label: "Pending"   },
+  { value: "completed", label: "Completed" },
+];
+const PRIORITY_CHIPS = [
+  { value: "",       label: "Any Priority" },
+  { value: "high",   label: "🔴 High"      },
+  { value: "medium", label: "🟡 Medium"    },
+  { value: "low",    label: "🟢 Low"       },
+];
+const SORT_OPTIONS = [
+  { value: "newest",   label: "Newest"   },
+  { value: "oldest",   label: "Oldest"   },
+  { value: "alpha",    label: "A → Z"    },
+  { value: "priority", label: "Priority" },
+  { value: "dueDate",  label: "Due Date" },
+];
+
+export default function TaskList({
+  tasks, loading, total, page, totalPages,
+  filters, onFilterChange, onPageChange,
+  onToggle, onDelete, onEdit,
 }) {
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const { categories } = useCategories();
+
   return (
     <div className="task-list-wrapper">
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div className="toolbar card">
-        {/* Search */}
-        <div className="toolbar__search">
-          <FiSearch className="toolbar__search-icon" />
-          <input
-            type="search"
-            className="input toolbar__search-input"
-            placeholder="Search tasks..."
-            value={filters.search}
-            onChange={(e) => onFilterChange("search", e.target.value)}
-            aria-label="Search tasks"
-          />
-        </div>
-
-        {/* Filter controls */}
-        <div className="toolbar__filters">
-          {/* Status filter */}
-          <div className="filter-group">
-            <FiFilter className="filter-group__icon" />
-            <select
-              className="input select select--sm"
-              value={filters.status}
-              onChange={(e) => onFilterChange("status", e.target.value)}
-              aria-label="Filter by status"
-            >
-              <option value="all">All Tasks</option>
-              <option value="pending">Pending</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
-
-          {/* Priority filter */}
-          <select
-            className="input select select--sm"
-            value={filters.priority}
-            onChange={(e) => onFilterChange("priority", e.target.value)}
-            aria-label="Filter by priority"
+      {/* ── Search bar ─────────────────────────────────────────────────── */}
+      <div className="tl-search glass-card">
+        <FiSearch className="tl-search__icon" />
+        <input
+          type="search"
+          className="tl-search__input"
+          placeholder="Search tasks…"
+          value={filters.search}
+          onChange={(e) => onFilterChange("search", e.target.value)}
+          aria-label="Search tasks"
+        />
+        {filters.search && (
+          <button
+            className="icon-btn tl-search__clear"
+            onClick={() => onFilterChange("search", "")}
+            aria-label="Clear search"
           >
-            <option value="">All Priorities</option>
-            <option value="high">🔴 High</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="low">🟢 Low</option>
-          </select>
-
-          {/* Sort */}
-          <select
-            className="input select select--sm"
-            value={filters.sort}
-            onChange={(e) => onFilterChange("sort", e.target.value)}
-            aria-label="Sort tasks"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="alpha">A → Z</option>
-            <option value="priority">By Priority</option>
-            <option value="dueDate">By Due Date</option>
-          </select>
-        </div>
+            <FiX />
+          </button>
+        )}
       </div>
 
-      {/* ── Results count ───────────────────────────────────────────────── */}
+      {/* ── Filter + sort row ──────────────────────────────────────────── */}
+      <div className="tl-filters">
+        {/* Status chips */}
+        <div className="tl-chips" role="group" aria-label="Filter by status">
+          {STATUS_CHIPS.map(({ value, label }) => (
+            <motion.button
+              key={value}
+              type="button"
+              className={`chip${filters.status === value ? " chip--active" : ""}`}
+              onClick={() => onFilterChange("status", value)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {label}
+              {filters.status === value && (
+                <motion.span
+                  layoutId="status-chip-bg"
+                  className="chip__bg"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                />
+              )}
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Priority chips */}
+        <div className="tl-chips" role="group" aria-label="Filter by priority">
+          {PRIORITY_CHIPS.map(({ value, label }) => (
+            <motion.button
+              key={value}
+              type="button"
+              className={`chip chip--sm${filters.priority === value ? " chip--active" : ""}`}
+              onClick={() => onFilterChange("priority", value)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {label}
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Category filter */}
+        {categories.length > 0 && (
+          <select
+            className="input select select--sm"
+            value={filters.category || ""}
+            onChange={(e) => onFilterChange("category", e.target.value)}
+            aria-label="Filter by category"
+          >
+            <option value="">All Categories</option>
+            <option value="none">Uncategorised</option>
+            {categories.map((c) => (
+              <option key={c._id} value={c._id}>{c.name}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Sort */}
+        <select
+          className="input select select--sm tl-sort"
+          value={filters.sort}
+          onChange={(e) => onFilterChange("sort", e.target.value)}
+          aria-label="Sort tasks"
+        >
+          {SORT_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* ── Results count ──────────────────────────────────────────────── */}
       {!loading && (
-        <p className="results-count">
+        <p className="tl-count">
           {total === 0
             ? "No tasks found"
-            : `${total} task${total !== 1 ? "s" : ""} found`}
-          {page > 1 && ` — page ${page} of ${totalPages}`}
+            : `${total} task${total !== 1 ? "s" : ""}`}
+          {page > 1 && ` · page ${page} of ${totalPages}`}
         </p>
       )}
 
-      {/* ── Task cards / skeleton / empty state ─────────────────────────── */}
+      {/* ── List / skeleton / empty ─────────────────────────────────────── */}
       {loading ? (
         <SkeletonList count={5} />
       ) : tasks.length === 0 ? (
-        <div className="empty-state card">
+        <motion.div
+          className="empty-state glass-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <FiInbox className="empty-state__icon" />
           <h3 className="empty-state__title">No tasks here</h3>
           <p className="empty-state__text">
-            {filters.search || filters.status !== "all" || filters.priority
-              ? "Try adjusting your filters."
-              : "Add your first task above to get started!"}
+            {filters.search || filters.status !== "all" || filters.priority || filters.category
+              ? "Try clearing some filters."
+              : "Add your first task above!"}
           </p>
-        </div>
+        </motion.div>
       ) : (
-        <ul className="task-list">
-          {tasks.map((task) => (
-            <TaskItem
-              key={task._id}
-              task={task}
-              onToggle={onToggle}
-              onDelete={onDelete}
-              onEdit={onEdit}
-            />
-          ))}
-        </ul>
+        <AnimatePresence mode="popLayout">
+          <ul className="task-list">
+            {tasks.map((task) => (
+              <TaskItem
+                key={task._id}
+                task={task}
+                onToggle={onToggle}
+                onDelete={onDelete}
+                onEdit={onEdit}
+              />
+            ))}
+          </ul>
+        </AnimatePresence>
       )}
 
       {/* ── Pagination ──────────────────────────────────────────────────── */}
@@ -145,12 +181,11 @@ function TaskList({
           >
             <FiChevronLeft /> Prev
           </button>
-
           <div className="pagination__pages">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button
                 key={p}
-                className={`btn btn--sm ${p === page ? "btn--primary" : "btn--ghost"}`}
+                className={`btn btn--sm${p === page ? " btn--primary" : " btn--ghost"}`}
                 onClick={() => onPageChange(p)}
                 aria-current={p === page ? "page" : undefined}
               >
@@ -158,7 +193,6 @@ function TaskList({
               </button>
             ))}
           </div>
-
           <button
             className="btn btn--ghost btn--sm"
             disabled={page >= totalPages}
@@ -172,5 +206,3 @@ function TaskList({
     </div>
   );
 }
-
-export default TaskList;

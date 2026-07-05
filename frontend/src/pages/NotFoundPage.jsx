@@ -1,32 +1,29 @@
 // src/pages/NotFoundPage.jsx
-// 404 page shown for any unmatched route.
 
 import { Link } from "react-router-dom";
-import { FiArrowLeft, FiCheckSquare } from "react-icons/fi";
+import { motion } from "framer-motion";
+import { FiArrowLeft } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 
-function NotFoundPage() {
+export default function NotFoundPage() {
   const { user } = useAuth();
-
   return (
     <div className="not-found-page">
-      <div className="not-found__content">
-        <FiCheckSquare className="not-found__icon" />
-        <h1 className="not-found__code">404</h1>
+      <motion.div
+        className="not-found__content"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <p className="not-found__code">404</p>
         <h2 className="not-found__title">Page not found</h2>
         <p className="not-found__text">
-          Looks like you've wandered off the task list. Let's get you back on track.
+          Looks like you wandered off the task list.
         </p>
-        <Link
-          to={user ? "/dashboard" : "/login"}
-          className="btn btn--primary"
-        >
-          <FiArrowLeft />
-          {user ? "Back to Dashboard" : "Back to Login"}
+        <Link to={user ? "/dashboard" : "/login"} className="btn btn--primary">
+          <FiArrowLeft /> {user ? "Back to Dashboard" : "Back to Login"}
         </Link>
-      </div>
+      </motion.div>
     </div>
   );
 }
-
-export default NotFoundPage;
