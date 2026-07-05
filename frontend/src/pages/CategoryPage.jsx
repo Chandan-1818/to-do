@@ -2,7 +2,7 @@
 // Category management grid with enhanced cards: completion progress bar,
 // analytics chips, and a "View Details" link on each card.
 
-import { useState, useMemo }       from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link }                    from "react-router-dom";
 import {
@@ -40,6 +40,10 @@ const cardVariant = {
 export default function CategoryPage() {
   const { categories, loading, refresh, removeCategory } = useCategories();
   const { showToast } = useToast();
+
+  // Re-fetch on mount so task counts / completion stats reflect any task
+  // CRUD that happened on other pages since the last fetch.
+  useEffect(() => { refresh(); }, [refresh]);
 
   const [search,       setSearch]       = useState("");
   const [formOpen,     setFormOpen]     = useState(false);

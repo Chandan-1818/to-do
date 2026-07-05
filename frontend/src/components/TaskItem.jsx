@@ -5,7 +5,7 @@
 import { useState }             from "react";
 import { motion }               from "framer-motion";
 import { FiEdit2, FiTrash2, FiCalendar, FiFlag, FiCheckCircle, FiCircle } from "react-icons/fi";
-import { useCategories }        from "../context/CategoryContext";
+import { getCategoryIcon }      from "../utils/categoryIcons";
 import TaskForm                 from "./TaskForm";
 import ConfirmDialog            from "./ConfirmDialog";
 
@@ -98,19 +98,23 @@ export default function TaskItem({ task, onToggle, onDelete, onEdit }) {
               {p.label}
             </span>
 
-            {/* Category */}
-            {cat && cat.name && (
-              <span
-                className="task-badge task-badge--cat"
-                style={{
-                  background: (cat.color || "#6366f1") + "20",
-                  color:      cat.color || "#6366f1",
-                  borderColor: (cat.color || "#6366f1") + "40",
-                }}
-              >
-                {cat.name}
-              </span>
-            )}
+            {/* Category — icon + name + colour badge */}
+            {cat && cat.name && (() => {
+              const CatIcon = getCategoryIcon(cat.icon);
+              return (
+                <span
+                  className="task-badge task-badge--cat"
+                  style={{
+                    background: (cat.color || "#6366f1") + "20",
+                    color:      cat.color || "#6366f1",
+                    borderColor: (cat.color || "#6366f1") + "40",
+                  }}
+                >
+                  <CatIcon />
+                  {cat.name}
+                </span>
+              );
+            })()}
 
             {/* Due date */}
             <DueBadge dueDate={task.dueDate} />
