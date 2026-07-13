@@ -4,14 +4,6 @@ A full-stack, multi-user To-Do application built with the **MERN** stack.
 Features JWT authentication, a responsive dark/light UI, advanced task
 management, and a personalised dashboard.
 
-## Screenshots
-
-> _Add screenshots to this section once the app is running._
-
-| Light mode | Dark mode |
-|------------|-----------|
-| ![light](./screenshots/light.png) | ![dark](./screenshots/dark.png) |
-
 ---
 
 ## Tech Stack
@@ -161,23 +153,6 @@ copy .env.example .env
 
 # macOS / Linux
 cp .env.example .env
-```
-
-Edit `backend/.env`:
-
-```env
-# Local MongoDB
-MONGO_URI=mongodb://localhost:27017/todoapp
-
-# MongoDB Atlas
-# MONGO_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/todoapp
-
-PORT=5000
-
-# Generate a strong secret:
-# node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-JWT_SECRET=replace_with_a_long_random_secret_string
-JWT_EXPIRES_IN=7d
 ```
 
 ### 3. Frontend setup
